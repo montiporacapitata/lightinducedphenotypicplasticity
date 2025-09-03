@@ -1,0 +1,134 @@
+---
+title: "alphadiv"
+author: "coral"
+date: "2025-03-20"
+output: html_document
+---
+#Packages
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("xfun")
+library(entropart)
+library(vegan)
+library(GGally)
+library(dplyr)
+library(factoextra) #factoshiny cool aussi
+library(SPECIES)
+library(deSolve)
+library(ggplot2)
+library(ggpubr)
+library(RColorBrewer)
+library(cowplot)
+library(FactoMineR)
+library(factoextra)
+library(ade4)
+library(gclus)
+library(ape)
+library(viridis)
+library(tidyverse)
+library(hablar)
+library(wesanderson)
+#library(wesanderson)
+display.brewer.all()
+
+setwd("E:/PhD_Organized/I. Science/C2. Symbionts/4. Rarefy and transform")
+```
+
+
+#Open files
+
+```{r}
+my_df_long <- read.csv("ITS2_data_long_rarefied.csv", sep = ",")
+#clean variable names
+sum(my_df_long$count)
+
+my_df_long$symbiont_ID <- gsub("GS_", " ", my_df_long$symbiont_ID )
+my_df_long$symbiont_ID <- gsub("LJ_", "", my_df_long$symbiont_ID )
+my_df_long$symbiont_ID <- gsub("S_", " ", my_df_long$symbiont_ID) 
+
+
+```
+
+
+#Pool clades together
+```{r}
+#pool clades together
+
+my_df_long$symbiont_ID <- gsub("C16[0-9]+", "C1", my_df_long$symbiont_ID )
+my_df_long$symbiont_ID <- gsub("C1\\D", "C1", my_df_long$symbiont_ID )
+
+my_df_long$symbiont_ID <- gsub("C17.[0-9]+", "C17", my_df_long$symbiont_ID )
+my_df_long$symbiont_ID <- gsub("C17\\D", "C17", my_df_long$symbiont_ID )
+
+my_df_long$symbiont_ID <- gsub("C21.[0-9]+", "C21", my_df_long$symbiont_ID )
+my_df_long$symbiont_ID <- gsub("C21\\D", "C21", my_df_long$symbiont_ID )
+my_df_long$symbiont_ID <- gsub("C2r", "C2", my_df_long$symbiont_ID )
+
+my_df_long$symbiont_ID <- gsub("C26.\\D", "C26", my_df_long$symbiont_ID )
+my_df_long$symbiont_ID <- gsub("C26[0-9]+", "C26", my_df_long$symbiont_ID )
+
+my_df_long$symbiont_ID <- gsub("C31.[0-9]+", "C31", my_df_long$symbiont_ID )
+my_df_long$symbiont_ID <- gsub("C31\\D", "C31", my_df_long$symbiont_ID )
+my_df_long$symbiont_ID <- gsub("C3\\D", "C3", my_df_long$symbiont_ID )
+
+my_df_long$symbiont_ID <- gsub("D1.[0-9]+", "D1", my_df_long$symbiont_ID )
+my_df_long$symbiont_ID <- gsub("D1[0-9]+", "D1", my_df_long$symbiont_ID )
+my_df_long$symbiont_ID <- gsub("D1\\D", "D1", my_df_long$symbiont_ID )
+
+my_df_long$symbiont_ID <- gsub("D2.[0-9]+", "D2", my_df_long$symbiont_ID )
+```
+
+
+#Barplot on rarefied data
+```{r}
+
+my_df_long_ok <- my_df_long %>% dplyr::filter(time == "t0+1.5Y") 
+nrow(my_df_long_ok)
+
+my_df_long_test <- my_df_long_ok %>% group_by(Sample_ID) %>%
+  dplyr::summarise(
+    n=n(),
+      mean_count = mean(count),
+      sd_count = sd(count)
+      ) %>% 
+  ungroup()
+
+#Stacked column plots
+cols1 <- mako(9, dir = -1) 
+cols2 <- magma(9)
+
+
+colclade <- my_df_plot %>% mutate(treatment_time = fct_relevel(treatment_time, 
+            "Control_t0", "Shade_t0", "Control_t0+06m", 
+            "Shade_t0+06m", "Control_t0+18m", "Shade_t0+18m" 
+            )) %>% ggplot(aes(y = treatment_time, x = count, fill = symbiont_ID)) + geom_col(position="fill") + scale_fill_manual(values = c(cols2[-c(1,2)], cols1[-c(1,9)])) +xlab("Relative symbiont abundance") + ylab("Treatment and time of collection")+ theme_cowplot(10) + theme(legend.position = "top")+
+    scale_y_discrete(limits=rev)
+colclade
+
+my_df_long <- my_df_long %>% mutate(genotype = recode(genotype, G19 ="A", G58 = "B", G60= "C", G62 = "D", G64= "E", G64Y="F", G90="G", G92 = "H", GP1R2="I"))
+
+my_df_long_0 <- my_df_long %>% dplyr::filter(time == "t0") 
+
+colclade_gen0 <- ggplot(my_df_long_0, aes(x = genotype, y = count, fill = symbiont_ID)) + geom_col(position="fill") + scale_fill_manual(values = c(cols2[-c(1,2)], cols1[-c(1,9)])) + theme_cowplot(10) +ylab("") + xlab("")
+colclade_gen0
+
+my_df_long_1 <- my_df_long %>% dplyr::filter(time == "t0+06m") 
+colclade_gen1 <- ggplot(my_df_long_1, aes(x = genotype, y = count, fill = symbiont_ID)) + geom_col(position="fill") + scale_fill_manual(values = c(cols2[-c(1,2)], cols1[-c(1,9)])) + theme_cowplot(10) +ylab("Relative symbiont abundance") + xlab("")
+colclade_gen1
+
+my_df_long_2 <- my_df_long %>% dplyr::filter(time == "t0+1.5Y") 
+colclade_gen2 <- ggplot(my_df_long_2, aes(x = genotype, y = count, fill = symbiont_ID)) + geom_col(position="fill") + scale_fill_manual(values = c(cols2[-c(1,2)], cols1[-c(1,9)])) + theme_cowplot(10) +ylab("") + xlab("Genotype")
+colclade_gen2
+#Plot grid (can be slow)
+
+colclade = colclade + theme(legend.position = "none")
+colclade_gen0 = colclade_gen0 + theme(legend.position = "top")
+legend <- get_legend(colclade_gen0)
+colclade_gen0 = colclade_gen0 + theme(legend.position = "none")
+colclade_gen1 = colclade_gen1 + theme(legend.position = "none")
+colclade_gen2 = colclade_gen2 + theme(legend.position = "none")
+#colgen = colgen + theme(legend.position = "none")
+
+plot_grid(legend, colclade_gen0, colclade_gen1, colclade_gen2, nrow =4, rel_heights = c(1,3,3,3)) 
+```

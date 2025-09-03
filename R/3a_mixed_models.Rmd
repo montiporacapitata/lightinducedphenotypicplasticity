@@ -1,0 +1,308 @@
+---
+title: "mixed models"
+author: "coral"
+date: "2025-07-30"
+output: html_document
+---
+#Packages and files
+```{r}
+library(readr)
+library(stats)
+library(rstatix)
+library(reshape2)
+library(ggplot2)
+library(ggpubr)
+library(tidyverse)
+library(stringr)
+library(lme4)
+library(stargazer)
+#library(MuMIn)
+library(GGally)
+library(nlme)
+library(ggpubr)
+library(broom.mixed)
+library(gridExtra)
+
+setwd("E:/PhD_Organized/I. Science/E. Morphology/2. Traits_extraction")
+
+ALLvarsTR <- as.data.frame(read_delim("habtoolsvarsTR_lr.txt", delim="\t"))
+#ALLvarsTR <- ALLvarsTR %>% dplyr::select(-(`lr_packing`))
+```
+
+#Mortality
+
+```{r}
+df <- as.data.frame(read_delim("metadata.csv", delim=";"))
+data_mortality <- subset(df, df$mortality=="0")
+sum(data_mortality$treatment_time =="Control_0yr")
+sum(data_mortality$treatment_time =="Shade_0yr")
+
+ggplot(data_mortality, aes(x = 1-mortality, fill = treatment_time)) + geom_bar(position = position_dodge(width = 1))+ xlab("") + ylab("Number of living individuals") + theme_classic(20) + scale_fill_manual(values = c("grey", "goldenrod", "grey49", "midnightblue")) + theme(legend.position = "none") 
+
+
+mlm <- glm(data = df, mortality ~ treatment*time, family = binomial(), maxit = 100)
+mlme1 <- glmer(data = df, mortality ~ time/treatment + 
+                 (1|genotype) + (1|rack),
+               family = binomial)
+mlme2 <- glmer(data = df, mortality ~ treatment+time + 
+                 (1|genotype),
+               family = binomial)
+mlme3 <- glmer(data = df, mortality ~ time+genotype + 
+                 (1|treatment),
+               family = binomial)
+
+AIC(mlm,mlme1,mlme2, mlme3) 
+summary(mlm)
+summary(mlme3)
+
+plot(mlm)
+plot(mlme3)
+```
+
+
+
+# Traits model selection
+
+## volume
+
+```{r}
+
+#step 1:lm
+
+Vlm <- lm(data = ALLvarsTR, lr_volume ~ treatment)
+
+# step 2
+Vlm <- gls(data = ALLvarsTR, lr_volume ~ treatment)
+Vlm1 <- lme(data = ALLvarsTR, lr_volume ~ treatment, 
+             random = list(~ 1|genotype, ~ 1|rack))
+Vlm2 <- lme(data = ALLvarsTR, lr_volume ~ treatment, 
+             random = list(~ 1|genotype))
+AIC(Vlm,Vlm1,Vlm2)
+
+#step3
+summary(Vlm2) # drop triple interaction
+anova(Vlm2)
+#Volume <- get_AICs(data, response, random)
+#D$AICs[D$AICs$AIC == min(D$AICs$AIC), ]
+Vlmes <- Vlm2
+```
+
+## surface area
+
+```{r}
+
+#step 1:lm
+
+SAlm <- lm(data = ALLvarsTR, lr_SA ~ treatment)
+
+# step 2
+SAlm <- gls(data = ALLvarsTR, lr_SA ~ treatment)
+SAlm1 <- lme(data = ALLvarsTR, lr_SA ~ treatment, 
+             random = list(~ 1|genotype, ~ 1|rack))
+SAlm2 <- lme(data = ALLvarsTR, lr_SA ~ treatment, 
+             random = list(~ 1|genotype))
+AIC(SAlm,SAlm1,SAlm2)
+
+#step3
+summary(SAlm2) # drop triple interaction
+anova(SAlm2)
+#Volume <- get_AICs(data, response, random)
+#D$AICs[D$AICs$AIC == min(D$AICs$AIC), ]
+SAlmes <- SAlm2
+```
+
+##SA:V ratio
+```{r}
+#step 1:lm
+
+SAVlm <- lm(data = ALLvarsTR, lr_SV_ratio ~ treatment)
+
+# step 2
+SAVlm <- gls(data = ALLvarsTR, lr_SV_ratio ~ treatment)
+SAVlm1 <- lme(data = ALLvarsTR, lr_SV_ratio ~ treatment, 
+             random = list(~ 1|genotype, ~ 1|rack))
+SAVlm2 <- lme(data = ALLvarsTR, lr_SV_ratio ~ treatment, 
+             random = list(~ 1|genotype))
+AIC(SAVlm,SAVlm1,SAVlm2)
+
+#step3
+summary(SAVlm2) # drop triple interaction
+anova(SAVlm2)
+ranef(SAVlm2)
+#Volume <- get_AICs(data, response, random)
+#D$AICs[D$AICs$AIC == min(D$AICs$AIC), ]
+SAVlmes <- SAVlm2
+```
+
+##rugosity
+```{r}
+#step 1:lm
+
+Rlm <- lm(data = ALLvarsTR, lr_rugosity ~ treatment)
+
+# step 2
+Rlm <- gls(data = ALLvarsTR, lr_rugosity ~ treatment)
+Rlm1 <- lme(data = ALLvarsTR, lr_rugosity ~ treatment, 
+             random = list(~ 1|genotype, ~ 1|rack))
+Rlm2 <- lme(data = ALLvarsTR, lr_rugosity ~ treatment, 
+             random = list(~ 1|genotype))
+AIC(Rlm,Rlm1,Rlm2)
+
+#step3
+summary(Rlm2) # drop triple interaction
+anova(Rlm2)
+#Volume <- get_AICs(data, response, random)
+#D$AICs[D$AICs$AIC == min(D$AICs$AIC), ]
+Rlmes <- Rlm2
+```
+
+
+##convexity
+```{r}
+#step 1:lm
+
+Clm <- lm(data = ALLvarsTR, lr_convexity ~ treatment)
+
+# step 2
+Clm <- gls(data = ALLvarsTR, lr_convexity ~ treatment)
+Clm1 <- lme(data = ALLvarsTR, lr_convexity ~ treatment, 
+             random = list(~ 1|genotype, ~ 1|rack))
+Clm2 <- lme(data = ALLvarsTR, lr_convexity ~ treatment, 
+             random = list(~ 1|genotype))
+AIC(Clm,Clm1,Clm2)
+
+#step3
+summary(Clm2) # drop triple interaction
+anova(Clm2)
+#Volume <- get_AICs(data, response, random)
+#D$AICs[D$AICs$AIC == min(D$AICs$AIC), ]
+Clmes <- Clm2
+```
+
+
+##top-heaviness
+```{r}
+#step 1:lm
+
+THlm <- lm(data = ALLvarsTR, lr_toph ~ treatment)
+
+# step 2
+THlm <- gls(data = ALLvarsTR, lr_toph ~ treatment)
+THlm1 <- lme(data = ALLvarsTR, lr_toph ~ treatment, 
+             random = list(~ 1|genotype, ~ 1|rack))
+THlm2 <- lme(data = ALLvarsTR, lr_toph ~ treatment, 
+             random = list(~ 1|genotype))
+AIC(THlm,THlm1,THlm2)
+
+#step3
+summary(THlm2) # drop triple interaction
+anova(THlm2)
+#Volume <- get_AICs(data, response, random)
+#D$AICs[D$AICs$AIC == min(D$AICs$AIC), ]
+THlmes <- THlm2
+```
+
+
+# Model summary tables
+```{r}
+
+stargazer(Vlmes,SAlmes,SAVlmes,Rlmes,Clmes, THlmes,
+          type = "text",title="Results -selected fixed and random effect", align=TRUE, out="models_fixed_noNesting.html", omit.stat=c("LL","bic"),
+          column.labels = c("lrV", "lrSA","lrSA-V", "lrR","lrC", "lrTH"), model.numbers = FALSE, 
+          star.cutoffs = 0.05, notes = "*p<0.05", notes.append = FALSE)
+stargazer(Vlm2,SAlm2,SAVlm2,Rlm2,Clm2,THlm2,
+          type = "text",title="Results -full models", align=TRUE, out="models_full1.html",
+          covariate.labels = c("Treatment",
+          "Intercept"),
+          omit.stat=c("LL","bic"), model.numbers = FALSE, 
+          star.cutoffs = 0.05, notes = "*p<0.05", ci = TRUE,  notes.append = FALSE)
+
+a <- stargazer(Vlmes,SAlmes,SAVlmes,Rlmes,Clmes, THlmes,
+          type = "html",title="Results -full models", align=TRUE, out="models_full2.html",
+          covariate.labels = c("Origin(S)","Destination(S)","Genus(P)", "Origin(S):Destination(S)", 
+                               "Origin(S):Genus(P)", "Destination(S):Genus(P)","Origin(S):Destination(S):Genus(P)",
+                               "Intercept"),
+          omit.stat=c("LL","bic"), model.numbers = FALSE, 
+          star.cutoffs = 0.05/8, notes = "*p<0.05", ci = TRUE,  notes.append = FALSE)
+a
+```
+
+#p-values
+```{r}
+p.adj.none <-as.data.frame(
+  rbind(c("lrV", p.adjust(summary(Vlmes)$tTable[, 5], method = "none", n = 8)),
+    c("lrSA", p.adjust(summary(SAlmes)$tTable[, 5], method = "none", n = 8)),
+    c("lrSAV", p.adjust(summary(SAVlmes)$tTable[, 5], method = "none", n = 8)),
+    c("lrR", p.adjust(summary(Rlmes)$tTable[, 5], method = "none", n = 8)),
+    c("lrC", p.adjust(summary(Clmes)$tTable[, 5], method = "none", n = 8)),
+    c("lrTH", p.adjust(summary(THlmes)$tTable[, 5], method = "none", n = 8))
+  )
+)
+setwd("E:/PhD_Organized/I. Science/E. Morphology/3b. LMM")
+write.table(p.adj.none, "p-value_model.txt")
+```
+
+
+# Effect size figure
+```{r}
+library(cowplot)
+summary_sel <-
+  rbind(cbind(var = "a. lr(V)", as.data.frame( tidy(Vlmes,conf.int=TRUE,effects="fixed"))[,-4]),
+    cbind(var = "b. lr(SA)", as.data.frame( tidy(SAlmes,conf.int=TRUE,effects="fixed"))[,-4]),
+    cbind(var = "c. lr(SA:V)", as.data.frame( tidy(SAVlmes,conf.int=TRUE,effects="fixed"))[,-4]),
+    cbind(var = "d. lr(R)", as.data.frame( tidy(Rlmes,conf.int=TRUE,effects="fixed"))[,-4]),
+    cbind(var = "e. lr(C)", as.data.frame( tidy(Clmes,conf.int=TRUE,effects="fixed"))[,-4]),
+    cbind(var = "f. lr(TopH)", as.data.frame( tidy(THlmes,conf.int=TRUE,effects="fixed"))[,-4])
+   )
+
+summary_sel$sig <- 0
+summary_sel$sig[summary_sel$p.value <= 0.05] <- 1
+
+summary_sel$Term_order <- order(summary_sel$term)
+#summary_sel$Term_labels <- as.character(pairs[summary_sel$Term_order])
+
+ facet_labeller <- function(variable,value){
+   return(labs[value])
+ }
+
+
+ggplot()+
+  geom_linerange(data=summary_sel[summary_sel$term != "(Intercept)",],
+                 mapping=aes(y= var, xmin=conf.low, xmax=conf.high), size = 2, col = "grey80")+
+  geom_point(data=summary_sel[summary_sel$term != "(Intercept)",],
+             mapping=aes(y=var, x=estimate, col = factor(sig)), size = 3)+
+  xlab("Estimates with 95% confidence intervals") +
+  ylab("Response variable/n") + ggtitle("lr(variable) ~ (1|genotype) + treatment")+
+    scale_y_discrete(limits=rev)+  # Big bold line at y=0
+  
+  geom_vline(xintercept=0,size=1, alpha=0.3, linetype="dashed")+
+  theme_cowplot() +
+  labs(y= "Response variable")+
+  theme(panel.grid = element_blank(),strip.text.x = element_text(size = 12), panel.grid.major.y = element_line(colour="grey90", size=0.5),legend.position="none", 
+        axis.text = element_text(size = 11), axis.title = element_text(size = 12))
+```
+
+#Random effects
+```{r}
+#create dataframe
+ran.dt <- data.frame()
+ran.sp.dt<- data.frame()
+labs2 <- c("lrV", "lrSA","lrSA-V", "lrR","lrC", "lrTH")
+mods2 <- list(Vlmes,SAlmes,SAVlmes,Rlmes,Clmes, THlmes)
+
+for (i in 1:6) {
+  re <- as.data.frame(ranef(mods2[[i]]))
+  colnames(re) <- "re"
+  ran.dt <- rbind(cbind(mod = labs2[i], eff = "gen",re, genotype = str_sub(row.names(re),start = 1, end = 2)),ran.dt)
+}
+
+
+library(viridis)
+library(cowplot)
+ranef.dt <- na.omit(ran.dt)
+
+ggplot(ranef.dt, aes(y=ranef.dt[,6],x=genotype, col = genotype)) +
+    geom_point()+facet_wrap(~mod, scales = "free_y") + scale_color_manual(values = c(viridis(9)))+ theme_cowplot(11) + ylab("Effect size") + geom_hline(yintercept = 0, lty = 2, col = "grey")
+
+```
+

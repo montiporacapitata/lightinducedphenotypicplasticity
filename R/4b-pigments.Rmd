@@ -1,0 +1,66 @@
+---
+title: "pigment overlap"
+author: "coral"
+date: "2025-06-26"
+output: html_document
+---
+
+# 1. Load required libraries/packages
+```{r}
+library(readr)
+library(reshape2)
+library(viridis)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(ggplot2)
+library(cowplot)
+library(RColorBrewer)
+library(patchwork)
+library(ecodist)
+library(vegan)
+library(factoextra)
+library(ade4)
+library(extrafont)
+library(bestNormalize)
+library(MVN)
+library(ggsignif)
+#font_import()
+#loadfonts(device="win")  
+
+## B) Set working directory
+setwd("E:/PhD_Organized/I. Science/E. Morphology/8. Reflectance")
+
+## C) Load data :
+pigment <- as.data.frame(read.csv("Predicted Pigments v2.csv",
+                                    sep = ";",
+                                      na = "NA"))
+#remove pigments with low prediction accuracies
+
+```
+
+
+#Differences
+```{r}
+diadn <- ggplot(pigment, aes(x = treatment_position, y=`ddx.chla`, fill = treatment, shape = position)) + geom_boxplot() + xlab("") +
+                  geom_jitter(stroke = 0.01, alpha = 0.2) + ylab("diadinoxantin : Chlorophyll a ") + theme_cowplot(12) + scale_fill_manual(values = c("goldenrod", "midnightblue" )) + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) + theme(legend.position = "none") 
+diadn
+
+chla <-  ggplot(ALLvarsTR, aes(x = treatment_position, y=chl_a, fill = treatment, shape = position)) + geom_boxplot()+
+                  geom_jitter(stroke = 0.01, alpha = 0.2) + xlab("") + ylab("Chlorphyll a (µg/cm²)") + theme_cowplot(12) + scale_fill_manual(values = c("goldenrod", "midnightblue" )) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))+theme(legend.position = "none")
+chla
+
+
+plot_grid(chla, diadn, nrow =1)
+
+
+#ANOVAs
+ALLvarsTR <- ALLvarsTR %>%  dplyr::filter(ALLvarsTR$treatment_position != "Control body")
+lm0 <- lm(ddx.chla ~ treatment*position, data = pigment)
+plot(lm0)
+shapiro.test(lm0$residuals)
+kruskal.test(ddx.chla ~ treatment_position, data = ALLvarsTR)
+anova(lm0)
+summary(lm0)
+```

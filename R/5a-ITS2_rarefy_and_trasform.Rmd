@@ -1,0 +1,106 @@
+---
+title: "rarefy"
+author: "coral"
+date: "2025-02-11"
+output: html_document
+---
+#Matrix data
+This section aims at transforming the data to have it as community matrices.
+
+```{r}
+library(tidyr)
+setwd("E:/PhD_Organized/I. Science/E. Morphology/9. paper/Data")
+df_long <- read.csv("ITS2_data_long.csv", sep = ";")
+metadata <- read.csv("ITS2_all_metadata.csv", sep = ";")
+
+my_df_long <- merge(metadata, df_long, by = "Sample_ID")
+
+#Mutate to community format
+
+library(fossil)
+my_df_commu <- as.data.frame(create.matrix(my_df_long, tax.name="seq_ID", locality="Sample_ID", abund = TRUE, abund.col="count"))
+my_df_commu <- as.data.frame(t(my_df_commu))
+
+#mean number of sequences per sample
+df_mean <- my_df_long %>% dplyr::group_by(Sample_ID) %>% dplyr::summarise(
+    seq_mean = mean(total_seq)
+    )
+
+mean(df_mean$seq_mean)
+```
+
+#Rarefaction at even depth
+
+```{r}
+library(vegan)
+library(GGally)
+library(tidyr)
+library(GUniFrac)
+
+rarecurve(my_df_commu, 100, step = 1, xlab = "Sample Size", ylab = "Species", label = FALSE, lty = 2, col = "red")
+my_df_commu_rare <- Rarefy(my_df_commu, depth = 1000)
+rare2 <- my_df_commu_rare[["otu.tab.rff"]]
+class(rare2)
+
+rare4 <- cbind(rare2, rownames(rare2))
+rare5 <- as.data.frame(rare4)
+names(rare5)[names(rare5) == "V34"] <- "Sample_ID"
+my_df_commu_rare_meta <- merge(metadata, rare5, by = "Sample_ID")
+
+#rename columns to have accurate symbiont type IDs
+
+colnames(my_df_commu_rare_meta) <- gsub("GS_", "", colnames(my_df_commu_rare_meta))
+
+colnames(my_df_commu_rare_meta) <- gsub("LJ_", "", colnames(my_df_commu_rare_meta))
+
+colnames(my_df_commu_rare_meta) <- gsub("S_", "", colnames(my_df_commu_rare_meta))
+
+#output
+setwd("E:/PhD_Organized/I. Science/C2. Symbionts/4. Rarefy and transform")
+write.csv(my_df_commu_rare_meta, "ITS2_data_community_rarefied.csv")
+
+```
+
+
+Long format.
+```{r}
+setwd("E:/PhD_Organized/I. Science/C2. Symbionts/4. Rarefy and transform")
+my_df_long_rarefied <- rare5 %>% 
+  tidyr::pivot_longer(-Sample_ID,
+                      names_to = "symbiont_ID",values_to = "count") %>% 
+  dplyr::left_join(metadata,by = "Sample_ID")
+write.csv(my_df_long_rarefied, "ITS2_data_long_rarefied_100.csv")
+```
+
+
+#Transform data if needed
+Idée; pour chaque type de transformation (identité, log10, sqrt, crl), avoir 2 jeux de données:
+
+-L'un avec toutes les abondances sans les variables facteurs
+
+-l'autre avec toutes les abondances + les variables facteurs
+
+```{r}
+library(compositions)
+
+l <- ncol(commu)
+
+
+commu_16000 <- commu[rowSums(commu) > 6000,]
+comm_n6000 <- comm[rowSums(comm[,1:l]) > 6000,]
+
+commu_log10 <- log10(commu)
+comm_log10 <- cbind(commu_log10, treat_ok[,-1])
+
+commu_sqrt <- sqrt(commu)
+comm_sqrt <- cbind(commu_sqrt, treat_ok[,-1])
+
+commu_clr <- clr(commu)
+comm_clr <- cbind(commu_clr, treat_ok[,-1])
+
+class(comm_clr)
+M <- ncol(comm_clr)
+comm_clr %>% 
+  convert(int(comm_clr[,-c(M,M-1,M-2,M-3)]))
+```
+

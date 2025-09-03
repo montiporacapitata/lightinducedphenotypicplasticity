@@ -1,0 +1,510 @@
+---
+title: "morphospace_overlap_habt"
+author: "coral"
+date: "2025-02-03"
+output: html_document
+---
+
+# 1. Load required libraries/packages
+```{r}
+library(readr)
+library(reshape2)
+library(viridis)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(ggplot2)
+library(cowplot)
+library(RColorBrewer)
+library(patchwork)
+library(ecodist)
+library(vegan)
+library(factoextra)
+library(ade4)
+library(extrafont)
+library(bestNormalize)
+library(MVN)
+#font_import()
+#loadfonts(device="win")  
+
+## B) Set working directory
+setwd("E:/PhD_Organized/I. Science/E. Morphology/2. Traits_extraction")
+
+## C) Load data :
+ALLvarsTR <- as.data.frame(read_delim("habtoolsvarsTR_log.txt",
+                                      "\t", escape_double = FALSE,
+                                      na = "NA", trim_ws = TRUE))
+
+```
+
+# 2. Select variables with significant differences between groups (all variables show significantl differences)
+
+
+```{r}
+
+an <- lapply(ALLvarsTR[,9:15], function(x) aov(x~treatment_time, data = ALLvarsTR))
+Posthoc <- sapply(an, TukeyHSD , simplify=FALSE)
+pval <- sapply(Posthoc, function(x) tail(unlist(x[1]), 4))
+comparison <- as.factor(c("Control_1yr-Control_0yr",
+                          "Control_1yr-Shade_1yr",
+                          "Shade_1yr-Shade_0yr",
+                          "Shade_0yr-Control_0yr"))
+row.names(pval)<- comparison
+pvaluedf.m <- melt(pval, value.name="p.value")
+
+
+varsInterDif <- subset(pvaluedf.m, p.value < 0.05)
+
+varsInterDif3spp <- varsInterDif %>%
+  group_by(Var2) %>%
+  filter(n() > 2) %>%
+  droplevels %>%
+  arrange(Var2) %>%
+  slice(1) %>% 
+  ungroup() %>% 
+  dplyr::select(Var2)
+
+vars_list <- as.factor(varsInterDif$Var2)
+
+varsInterDif_df <- ALLvarsTR %>%
+  dplyr::select(treatment_time,genotype,time,treatment,code,all_of(vars_list))
+
+
+```
+
+# 3. Scatterplots (just for visulization purposes)
+
+```{r}
+
+## A) Assess colors to treatments
+
+Treatment <- factor(varsInterDif_df$treatment_time,
+                  levels = c("Control_0yr","Control_1yr","Shade_0yr","Shade_1yr"),
+                  labels=c("C0","C1","S0","S1"))
+cols <- c("grey", "goldenrod", "grey25", "midnightblue")
+Genotype <- factor(varsInterDif_df$genotype, levels = c("19","58","60","62","64","64Y","90","92","P1R2"))
+
+## B) Check correlation and bi-plots
+
+library(psych)
+#varsInterDif_df_minimal <- varsInterDif_df %>% dplyr::select(-(`height_range$x.t`), -(`sphericity$x.t`), -(`packing$x.t`), -(`planar_area$x.t`)) %>% na.omit(varsInterDif_df_minimal)
+pairs.panels(varsInterDif_df[,c(6,7,8,10,11,12)],
+             gap = 0,
+             hist.col="grey",
+             bg = cols,
+             pch = 21,
+             ellipses=FALSE,
+             density = TRUE,
+             cex.cor=1,
+             cex=1,
+             stars = TRUE,
+             smooth=FALSE)
+
+## C) Plot bi-variate scatter plots and density plots
+
+# Example: FD and SV ratio
+na.omit(varsInterDif_df)
+cols2 <- c("goldenrod", "midnightblue")
+varsInterDif_df_scatter <-varsInterDif_df %>%  dplyr::filter(varsInterDif_df$treatment_time == "Control_1yr" | varsInterDif_df$treatment_time == "Shade_1yr")
+
+
+#scatterplot relationship
+scatter1 <- ggplot(varsInterDif_df_scatter,
+                   aes(x= `SV_ratio$x.t`,
+                       y = `convexity`,
+                       color=treatment_time, fill=treatment_time)) +
+  geom_point(size=2) + stat_ellipse(geom = "polygon",
+                                    linetype = "blank",
+                                    alpha=0.1) +
+  scale_colour_manual(name = "Group",
+                      labels = c("C1","S1"),
+                      values = cols2) +
+  scale_fill_manual(name = "Group",
+                    labels = c("C1","S1"),
+                    values = cols2) +
+  theme_bw(12) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  geom_hline(yintercept = 0, color = "grey", linetype = "dashed",
+             size=0.8)+
+  geom_vline(xintercept = 0, color = "grey", linetype = "dashed",
+             size=0.8)+
+  scale_x_continuous(limits = c(-2.8,2.8))+
+  scale_y_continuous(limits = c(-1.4, 0))+
+  theme(legend.position = c(.92, .2))+
+  labs(y= "Convexity",
+       x = "SV ratio")
+
+scatter1
+
+xdensity1 <- ggplot(varsInterDif_df_scatter,
+                    aes(x = `SV_ratio$x.t`, fill=treatment_time)) + 
+  geom_density(alpha=.5) + 
+  scale_fill_manual(values = cols2) +
+  scale_x_continuous(limits = c(-2.8,2.8)) + theme_classic(10) +
+  theme(legend.position = "none") +
+  labs(y= "Density",
+       x = "SV") + 
+  theme(axis.title.x=element_blank())
+
+xdensity1
+
+ydensity1 <- ggplot(varsInterDif_df_scatter,
+                    aes(x = `convexity`, fill=treatment_time)) + 
+  geom_density(alpha=.5) + 
+  scale_fill_manual(values = cols2) + theme_classic(10) +
+  theme(legend.position = "none") + 
+  scale_x_continuous(limits = c(-1.4, 0)) +
+  labs(y= "Density",
+       x = "da_mean") +
+  theme(axis.title.y=element_blank()) +
+  coord_flip()
+
+ydensity1
+
+# Complete plot:
+#(xdensity1 + plot_spacer())/ (scatter1 | ydensity1) 
+
+xdensity1 + plot_spacer() + scatter1 + ydensity1 +
+  plot_layout(ncol = 2, nrow = 2, 
+                heights = c(2, 7),
+                widths = c(6, 1))
+```
+
+
+# 4. PCA
+
+```{r}
+varsInterDif_df_minimal <- na.omit(varsInterDif_df)
+#PCA with one individual removed, as its scanning failed
+
+res.pca <- dudi.pca(varsInterDif_df_minimal[,c(6,7,8,10,11,12)],
+                    scale = TRUE,
+                    center = TRUE,
+                    scannf = FALSE,   # Hide scree plot
+                    nf = 5            # Number of components kept in results
+) 
+
+fviz_pca_var(res.pca, col.var = "cos2", gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), repel = TRUE)   # Color by the quality of representation  # Avoid text overlapping
+
+#get contributions of each variables and each axis
+var <- get_pca_var(res.pca)
+var$cos2
+library("corrplot")
+#corrplot(var$contrib)
+
+
+#PCA plot individuals
+
+treatment <- varsInterDif_df_minimal[,1]
+treatment
+genotype <- varsInterDif_df_minimal[,2]
+time <-varsInterDif_df_minimal$time
+
+a <- fviz_pca_ind(res.pca, repel = TRUE, geom = "point", labelsize = 3, geom.ind = c("point"), addEllipses = FALSE, ellipse.level = 0.55, habillage = time, palette = c("grey","black"),
+                  ggtheme = theme_cowplot(9),
+                  title = ("PCA - individuals"))  
+a
+
+#with hulls 
+
+
+pca.hulls <- cbind(varsInterDif_df_minimal, res.pca$li)
+family.hulls <- pca.hulls %>%
+  group_by(time) %>%
+  slice(chull(Axis1, Axis2))
+
+# add the family convex hulls to the PCA
+pca.hulls.ok <- a +
+  geom_polygon(data = family.hulls, aes(x = Axis1, y = Axis2, fill = time), alpha = 0.2, lty = 1, show.legend = F)
+pca.hulls.ok
+
+#biplot with individuals grouped by treatment and time
+PCA <- fviz_pca_biplot(res.pca, repel = TRUE, labelsize = 3, geom.ind = c("point"), addEllipses = TRUE, ellipse.level = 0.55, habillage = treatment, palette = c("grey", "goldenrod", "grey49", "midnightblue"),
+                col.var = "black", alpha.var = 0.3, select.var = list(cos2 = 9,  repel = TRUE), ggtheme = theme_cowplot(9),
+                title = ("") 
+                
+)
+PCA #+ theme(legend.position = "none")
+
+#biplot with individuals grouped by genotype
+PCAg <- fviz_pca_biplot(res.pca, repel = TRUE, labelsize = 3, geom.ind = c("point"), addEllipses = TRUE, ellipse.level = 0.55, habillage = genotype, palette = c(viridis(9)),
+                col.var = "black", alpha.var = 0.3, select.var = list(cos2 = 9,  repel = TRUE), ggtheme = theme_cowplot(9),
+                title = ("") 
+                
+)
+PCAg
+
+
+#PC1
+library(scales)
+#clean variable names
+contrib_df_1 <- as.data.frame(var$contrib)
+row.names(contrib_df_1) <- gsub("_", "\n", row.names(contrib_df_1))
+row.names(contrib_df_1) <- gsub("\\$x.t", "", row.names(contrib_df_1))
+
+#plot
+PC1 <- ggplot(data=contrib_df_1,
+       aes(x=reorder(row.names(contrib_df_1),desc(Dim.1)), y=(Dim.1), fill = Dim.1)) +
+  geom_bar(stat="identity") +
+  scale_fill_gradient(low = "#eae9e9", high = "#353434") +
+  theme_classic(10) +
+  theme(axis.text.x = element_text()) +
+  theme(axis.title.x = element_blank()) +
+  scale_x_discrete(labels = label_wrap(9))+
+  labs(y = "%PC1") 
+PC1
+
+#PC2
+contrib_df_2 <- as.data.frame(var$contrib)
+row.names(contrib_df_2) <- gsub("_", " ", row.names(contrib_df_2))
+row.names(contrib_df_2) <- gsub("\\$x.t", "", row.names(contrib_df_2))
+
+PC2 <- ggplot(data=contrib_df_2,
+       aes(x=reorder(row.names(contrib_df_2),(Dim.2)), y=Dim.2, fill = Dim.2)) +
+  geom_bar(stat="identity") +
+  scale_fill_gradient(low = "#eae9e9", high = "#353434") +
+  scale_y_continuous(position = 'left')+
+  theme_classic(10) +
+  #theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  ylab("%PC2")+ 
+  xlab("")+       #+ theme(axis.title.y.right)
+  coord_flip()
+PC2
+
+#Complete plot
+#library(patchwork)
+#pca.hulls.ok = pca.hulls.ok + theme(legend.position = c(0.8,0.875))
+#PC1 = PC1 + theme(legend.position = "none") + xlab("")
+#PC2 = PC2 + theme(legend.position = "none") + xlab("")
+#pca.hulls.ok + PC2 + PC1 +
+#  plot_layout(nrow = 2, ncol = 2,
+#              heights = c(7, 1),
+#              widths = c(7, 1))
+
+#adonis
+dist_matrix <- vegdist(varsInterDif_df_minimal[,c(6,7,8,10,11,12)], method = "euclidian")
+betadisper(dist_matrix, varsInterDif_df_minimal$treatment_time)
+adon.results <- adonis2(dist_matrix ~ varsInterDif_df_minimal$treatment_time*varsInterDif_df_minimal$genotype, method = "euclidian", perm = 999, data = varsInterDif_df)
+print(adon.results)
+#summary(adon.results)
+
+
+```
+
+#5. pairwise adonis: 
+
+```{r}
+
+#Is distance significant among groups?
+pairwise_permanova <- function(sp_matrix, group_var, dist = "euclidian", adj = "none", perm = 10000) {
+  
+  require(vegan)
+  
+  ## list contrasts
+  group_var <- as.character(group_var)
+  groups <- as.data.frame(t(combn(unique(group_var), m = 2)))
+  
+  contrasts <- data.frame(
+    group1 = groups$V1, group2 = groups$V2,
+    R2 = NA, F_value = NA, df1 = NA, df2 = NA, p_value = NA
+  )
+  
+  for (i in seq(nrow(contrasts))) {
+    sp_subset <- group_var == contrasts$group1[i] | group_var == contrasts$group2[i] 
+    contrast_matrix <- sp_matrix[sp_subset,]
+    
+    ## fit contrast using adonis
+    fit <- vegan::adonis2(
+      contrast_matrix ~ group_var[sp_subset],
+      method = dist, 
+      perm = perm
+    )
+    
+    contrasts$R2[i] <- round(fit$R2[1], digits = 3)
+    contrasts$F_value[i] <- round(fit[["F"]][1], digits = 3)
+    contrasts$df1[i] <- fit$Df[1]
+    contrasts$df2[i] <- fit$Df[2]
+    contrasts$p_value[i] <- fit$`Pr(>F)`[1]
+  }
+  
+  ## adjust p-values for multiple comparisons
+  contrasts$p_value <- round(p.adjust(contrasts$p_value, method = adj), digits = 10)
+  
+  return(list(
+    contrasts = contrasts, 
+    "p-value adjustment" = adj, 
+    permutations = perm
+  ))
+}
+
+pairwise_permanova(varsInterDif_df_minimal[,c(6,7,8,10,11,12)], varsInterDif_df_minimal[,2], dist = "euclidian", adj = "none", perm = 10000)
+```
+
+#6. distances and angles in PCA
+
+```{r}
+#get the distances (x1-x0) and (y1-y0) for each pair of points
+coord <- res.pca$li
+ALLvarsTR2 <- na.omit(varsInterDif_df_minimal)
+coord_df <- cbind(varsInterDif_df_minimal[,-6], coord)
+
+#slpit df in 2;  t0 and t1
+#order each df by code, remove missing individuals
+#apply function between dfs
+#store vector of results in t1 df
+#plot it against mortality, ~wrap(treatment)
+
+#split df
+df1_raw <- subset(coord_df, time == "1yr")
+df0_raw <- subset(coord_df, time == "0yr")
+
+df1_raw <- df1_raw[order(df1_raw$code),]
+df0_raw <- df0_raw[order(df0_raw$code),]
+
+#remove individuals that do not have both t1 and t0 scans due to high mortality or presence of NAs
+df1 <- df1_raw[-c(37,39,41,44),] 
+df0 <- df0_raw[-c(3,8,18,40,43),] 
+
+# Calculate the distances between each pair (one from t1, one from t0)
+distances <- vector("numeric", length = length(pairs))  # Define a vector to store distances
+
+euclidean_distance <- function(ind1, ind2) {
+  sqrt(sum((ind1 - ind2)^2))
+}
+
+for (i in 1:nrow(df1)) { #df1 and df0 have same number of rows
+  indA <- c(df1[i, 9], df1[i,10])
+  indB <- c(df0[i, 9], df0[i,10])
+  
+  # Compute distance for each pair
+  distances[i] <- euclidean_distance(indA, indB)
+}
+
+distances
+#add distance vector to df t1
+
+df1_dist <- cbind(df1, distances)
+
+#relationship?
+shapiro.test(df1_dist$distances) #is normal
+library(stats)
+library(ggsignif)
+t.test(df1_dist$distances ~ df1_dist$treatment, p.adjust.method = "none") #significant difference
+
+#with genotypes
+
+dist_plot <- ggplot(data = df1_dist, aes(x = treatment, y = distances, color= genotype)) + geom_line(position = position_dodge(width = 0.3))+ geom_signif(comparisons = list(c("Control", "Shade")), map_signif_level = TRUE, y_position = c(2.2), annotations = c("ns"), col = "black", textsize = 3)+
+     stat_summary(fun.y = "mean", geom = "point", size = 3, position = position_dodge(width = 0.3)) + xlab("") + ylab("d(t1;t0)") + theme_cowplot(9) + scale_color_manual(values = viridis(9)) + theme(legend.position = "none") + stat_summary(fun=mean, geom="line", aes(group=genotype), lty = 2)
+dist_plot
+
+#effect?
+dist_gen <- lm(distances~ treatment, data = df1_dist)
+dist_gen1 <- lm(distances~ treatment*genotype, data = df1_dist)
+dist_gen2 <- lmer(distances~ (1|genotype) + treatment, data = df1_dist)
+#plot(dist_gen)
+AIC(dist_gen, dist_gen1, dist_gen2)
+anova(dist_gen1)  
+
+#pairwise comp
+pairwise.t.test(df1_dist$distances, df1_dist$genotype, p.adjust.method = "none")
+
+
+#Ordination plot with disatnces between paired points
+
+pca1 <- df0 
+pca2 <- df1
+
+# Merge both sets for plotting arrows
+combined <- pca1 %>%
+  rename(PC1_start = Axis1, PC2_start = Axis2) %>%
+  left_join(pca2 %>% rename(PC1_end = Axis1, PC2_end = Axis2), by = "code") %>%
+  mutate(distance = sqrt((PC1_end - PC1_start)^2 + (PC2_end - PC2_start)^2))
+
+
+# Plot with arrows
+distance <- ggplot(combined) +
+  geom_segment(aes(x = PC1_start, y = PC2_start, 
+                   xend = PC1_end, yend = PC2_end, colour = treatment.y), 
+               arrow = arrow(length = unit(0.2, "cm")),) +
+  geom_point(aes(x = PC1_start, y = PC2_start), shape = 1) +
+  geom_point(aes(x = PC1_end, y = PC2_end), shape = 2) +
+  scale_color_manual(values = c("goldenrod", "midnightblue"))+
+  theme_cowplot(9) +
+  #xlim(-5,3)+
+  #ylim(-2.5,2.5)+
+  geom_polygon(data = family.hulls, aes(x = Axis1, y = Axis2, fill= time), alpha = 0.06, lty = 2, show.legend = F)+ scale_fill_manual(values = c("red", "blue"))
+distance
+
+
+#Get angle of the corresponding vectors
+angle_df <- pca1 %>%
+  rename(PC1_start = Axis1, PC2_start = Axis2) %>%
+  left_join(pca2 %>% rename(PC1_end = Axis1, PC2_end = Axis2), by = "code") %>%
+  mutate(tan = (PC1_end - PC1_start)/(PC2_end - PC2_start))
+
+angle <- atan(angle_df$tan) 
+angle_df <- cbind(angle_df, angle)
+
+#plot angles between control and shaded individuals
+theta <- ggplot(angle_df, aes(x = treatment.y, y = angle, color = genotype.x))  + geom_line(position = position_dodge(width = 0.3))+
+     stat_summary(fun.y = "mean", geom = "point", size = 3, position = position_dodge(width = 0.3))+ geom_signif(comparisons = list(c("Control", "Shade")), map_signif_level = TRUE, y_position = c(1.6), annotations = c("***"), col = "black", textsize = 3) + scale_color_manual(values = viridis(9))+ stat_summary(fun=mean, geom="line", aes(group=genotype.x), lty = 2) +theme_cowplot(9) +ylab("θ(t1;t0)") + xlab("")+theme(legend.position = "none")
+theta
+
+#test for effect of treatment on direction of vectors
+
+my_lm <- lm(angle~treatment.y, data = angle_df)
+my_lm1 <- lm(angle~treatment.y*genotype.x, data = angle_df)
+shapiro.test(my_lm$residuals)
+anova(my_lm1)
+
+library(lme4)
+library(lmerTest)
+my_lm2 <- lmer(angle~ (1|genotype.y) + treatment.y, data = angle_df)
+AIC(my_lm,my_lm1,my_lm2)
+plot(my_test)
+qqnorm(resid(my_lm2))
+qqline(resid(my_lm2))
+anova(my_lm2)
+summary(my_lm2)
+
+extractAIC(my_lm2)
+
+
+#confidence interval
+
+confint(my_lm2)
+## estimates of random effects
+
+ranef(my_lm2)
+coef(my_lm2)
+
+
+#Look at effect ranges
+library(merTools)
+predictInterval(my_test)   # for various model predictions, possibly with new data
+
+REsim(my_lm2)             # mean, median and sd of the random effect estimates
+
+plotREsim(REsim(my_lm2)) # plot the interval estimates
+
+
+#PC2 coordinates
+
+##At t0
+rnorm_t0 <- ggplot(data = pca1, aes(x = treatment, y = Axis2, color = genotype))  + geom_line(position = position_dodge(width = 0.3))+
+     stat_summary(fun.y = "mean", geom = "point", size = 3, position = position_dodge(width = 0.3)) + scale_color_manual(values = viridis(9)) + theme_cowplot(9)+ theme(legend.position = "none") + geom_signif(comparisons = list(c("Control", "Shade")), map_signif_level = TRUE, y_position = c(3.15), annotations = c("ns"), col = "black", textsize = 3 )+ ylab("PC2 coordinate") + xlab("Treatment") + stat_summary(fun=mean, geom="line", aes(group=genotype), lty = 2) + xlab("Treatment")+theme(legend.position = "none")
+rnorm_t0
+
+##At t1
+rnorm_t1 <- ggplot(data = pca2, aes(x = treatment, y = Axis2, color = genotype)) + geom_line(position = position_dodge(width = 0.3))+
+     stat_summary(fun.y = "mean", geom = "point", size = 3, position = position_dodge(width = 0.3)) + scale_color_manual(values = viridis(9)) + theme_cowplot(9) + geom_signif(comparisons = list(c("Control", "Shade")), map_signif_level = TRUE, y_position = c(3), annotations = c("***"), col = "black", textsize = 3) + ylab("PC2 coordinate") + xlab("Treatment") + stat_summary(fun=mean, geom="line", aes(group=genotype), lty = 2) + theme(legend.position = "none")
+rnorm_t1
+
+
+library(ggpubr)
+legend <- get_legend(rnorm_t1)
+plot_grid(dist_plot, theta, nrow = 1, labels = c("(b)", "(c)","(d)","(e)"), label_x = 0.13, label_size = 9)
+
+
+```
