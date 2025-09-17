@@ -1,1 +1,1 @@
-Data and code used in the manuscript entitled "Evidence of light-driven phenotypic plasticity in the Hawaiian coral <i>Montipora capitata<i>"
+Data and code used in the manuscript entitled "Nature vs nurture? Light availability drives phenotypic plasticity within a reef coral species"
